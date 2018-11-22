@@ -23,7 +23,7 @@
 %% When a new listener request arrives, it is associated to a existing listener,
 %% if present. If not, a new one is started.
 %% When a new connection arrives, a standard cowboy_protocol is started.
-%% It then cycles over all registered listeners, until one of them accepts 
+%% It then cycles over all registered listeners, until one of them accepts
 %% the request.
 
 -module(nkpacket_cowboy).
@@ -62,9 +62,9 @@
 
 %% @private Starts a new shared transport or reuses an existing one
 %%
-%% The 'meta' field in NkPort can include options, but it will only be read from 
+%% The 'meta' field in NkPort can include options, but it will only be read from
 %% the first started server: tcp_listeners, tcp_max_connections, tls_opts
-%% It can also include 'cowboy_opts' with the same limitation. 
+%% It can also include 'cowboy_opts' with the same limitation.
 %% The following options are fixed: timeout, compress
 %%
 %% Each server can provide its own 'http_proto'
@@ -74,7 +74,7 @@
 start(#nkport{pid=Pid}=NkPort, #cowboy_filter{}=Filter) when is_pid(Pid) ->
     Fun = fun() -> do_start(NkPort, Filter) end,
     #nkport{listen_ip=Ip, listen_port=Port} = NkPort,
-    try 
+    try
         nklib_proc:try_call(Fun, {?MODULE, Ip, Port}, 100, 50)
     catch
         error:max_tries -> {error, {shared_failed, max_tries}}
@@ -90,9 +90,9 @@ do_start(#nkport{pid=Pid}=NkPort, Filter) when is_pid(Pid) ->
     case nklib_proc:values({?MODULE, Ip, Port}) of
         [{_Filters, Listen}|_] ->
             case nklib_util:call(Listen, {start, Pid, Transp, Filter}, 15000) of
-                ok -> 
+                ok ->
                     {ok, Listen};
-                {error, Error} -> 
+                {error, Error} ->
                     {error, {shared_failed, Error}}
             end;
         [] ->
@@ -115,29 +115,29 @@ get_all() ->
 -spec get_filters(inet:ip_address(), inet:port_number()) ->
     [#cowboy_filter{}].
 
-get_filters(Ip, Port) -> 
+get_filters(Ip, Port) ->
     % Should be only one
     [{Filters, _}|_] = nklib_proc:values({?MODULE, Ip, Port}),
     Filters.
 
 
-%% @doc Sends a cowboy reply 
--spec reply(cowboy:http_status(), cowboy_req:req()) -> 
+%% @doc Sends a cowboy reply
+-spec reply(cowboy:http_status(), cowboy_req:req()) ->
     cowboy_req:req().
 
 reply(Code, Req) ->
     reply(Code, #{}, <<>>, Req).
 
 
-%% @doc Sends a cowboy reply 
--spec reply(cowboy:http_status(), cowboy:http_headers(), cowboy_req:req()) -> 
+%% @doc Sends a cowboy reply
+-spec reply(cowboy:http_status(), cowboy:http_headers(), cowboy_req:req()) ->
     cowboy_req:req().
 
 reply(Code, Hds, Req) ->
     reply(Code, Hds, <<>>, Req).
 
 
-%% @doc Sends a cowboy reply 
+%% @doc Sends a cowboy reply
 -spec reply(cowboy:http_status(), cowboy:http_headers(),
             iodata() | {send_file, integer(), integer(), term()}, cowboy_req:req()) ->
     cowboy_req:req().
@@ -180,7 +180,7 @@ stream_body(Body, Fin, Req) when Fin==fin;Fin==nofin ->
 }).
 
 
-%% @private 
+%% @private
 -spec init(term()) ->
     {ok, #state{}} | {stop, term()}.
 
@@ -211,11 +211,11 @@ init([NkPort, #cowboy_filter{}=Filter]) ->
             },
             RanchId = {ListenIp, LocalPort},
             Timeout = case Meta of
-                #{idle_timeout:=Timeout0} -> 
+                #{idle_timeout:=Timeout0} ->
                     Timeout0;
-                _ when Transp==ws; Transp==wss -> 
+                _ when Transp==ws; Transp==wss ->
                     nkpacket_config_cache:ws_timeout();
-                _ when Transp==http; Transp==https -> 
+                _ when Transp==http; Transp==https ->
                     nkpacket_config_cache:http_timeout()
             end,
             %% @see cowboy_http:opts()
@@ -236,12 +236,12 @@ init([NkPort, #cowboy_filter{}=Filter]) ->
             },
             Max = maps:get(tcp_max_connections, Meta, 1024),
             ?DEBUG("staring Ranch ~p (max:~p) (opts:~p)", [RanchId, Max, CowboyOpts2]),
-            {ok, RanchPid} = ranch_listener_sup:start_link(
+            {ok, RanchPid} = ranch:start_listener(
                 RanchId,
-                maps:get(tcp_listeners, Meta, 100),
                 RanchMod,
                 [
-                    {socket, Socket}, 
+                    {num_acceptors, maps:get(tcp_listeners, Meta, 100)},
+                    {socket, Socket},
                     {max_connections, Max}
                 ],
                 CowboyMod,
@@ -277,7 +277,7 @@ init([NkPort, #cowboy_filter{}=Filter]) ->
             },
             {ok, register(State)};
         {error, Error} ->
-            ?LLOG(error, "could not start ~p transport on ~p:~p (~p)", 
+            ?LLOG(error, "could not start ~p transport on ~p:~p (~p)",
                    [Transp, ListenIp, ListenPort, Error]),
             {stop, Error}
     end.
@@ -356,7 +356,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec terminate(term(), #state{}) ->
     ok.
 
-terminate(Reason, #state{ranch_pid=RanchPid}=State) ->  
+terminate(Reason, #state{ranch_pid=RanchPid}=State) ->
     ?DEBUG("listener stop: ~p", [Reason]),
     #state{
         ranch_id = RanchId,
@@ -375,7 +375,7 @@ terminate(Reason, #state{ranch_pid=RanchPid}=State) ->
 %% ===================================================================
 
 %% @private Cowboy middleware callback
--spec execute(Req, Env)-> 
+-spec execute(Req, Env)->
     {ok, Req, Env} | {stop, Req} | {suspend, module(), atom(), list()}
     when Req::cowboy_req:req(), Env::cowboy_middleware:env().
 
@@ -464,7 +464,7 @@ execute([Filter|Rest], Req, Env) ->
 -spec listen_opts(#nkport{}) ->
     list().
 
-listen_opts(#nkport{transp=Transp, listen_ip=Ip}) 
+listen_opts(#nkport{transp=Transp, listen_ip=Ip})
         when Transp==ws; Transp==http ->
     [
         {ip, Ip}, {active, false}, binary,
