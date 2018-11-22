@@ -1,5 +1,5 @@
 APP = nkpacket
-REBAR = rebar3
+REBAR ?= rebar3
 
 .PHONY: rel stagedevrel package version all tree shell
 
@@ -61,4 +61,3 @@ docs:
 
 shell:
 	$(REBAR) shell --config config/shell.config --name $(APP)@127.0.0.1 --setcookie nk --apps $(APP)
-

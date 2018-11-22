@@ -1,0 +1,15 @@
+sudo: false
+language: erlang
+otp_release:
+  - 21.1.2
+  - 20.3
+
+cache:
+    directories:
+        - $HOME/.cache/rebar3
+
+install:
+  - wget https://github.com/erlang/rebar3/releases/download/3.6.2/rebar3 && chmod +x rebar3
+
+script:
+  - REBAR3=./rebar3 make && make tests && make dialyzer
